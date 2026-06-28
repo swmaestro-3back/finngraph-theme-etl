@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import date
 import json
-from models import Theme, Company
+from models import Theme, CompanyBase
 
 _DATA_ROOT = Path(__file__).parents[3] / "data"
 
@@ -23,7 +23,7 @@ class BaseExtractor(ABC):
         pass
 
     @abstractmethod
-    def extract_theme_stock(self, theme_id: int | None = None, theme_name: str | None = None) -> list[Company]:
+    def extract_theme_stock(self, theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
         """특정 테마에 속한 종목 목록을 추출한다.
 
         Args:

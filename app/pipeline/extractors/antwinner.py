@@ -1,6 +1,5 @@
 from extractors.base import BaseExtractor
-from models import Company, Theme
-from utils.krx import get_stock_by_krx
+from models import CompanyBase, Theme
 import requests
 import time
 
@@ -17,14 +16,14 @@ class AntWinnerExtractor(BaseExtractor):
         response.raise_for_status()
         return [Theme(name=name, source="antwinner") for name in response.json()]
 
-    def extract_theme_stock(self, theme_name: str) -> list[Company]:
+    def extract_theme_stock(self, theme_name: str) -> list[CompanyBase]:
         params = {
             "period": "this-week",
             "rateFilter": "all",
             "sortBy": "rate",
             "themes": theme_name,
         }
-        companies: list[Company] = []
+        companies: list[CompanyBase] = []
 
         try:
             response = requests.get(_SCREENER_URL, params=params, headers=_HEADERS, timeout=10)
@@ -33,23 +32,19 @@ class AntWinnerExtractor(BaseExtractor):
 
             for stock in data.get("stocks", []):
                 stock_name = stock["stock_name"]
+                stock_code = stock["stock_code"]
 
                 # 가스 테마로 검색했을때 가스 라는 키워드가 포함된 모든 테마에 대한 주식이 다 나옴
                 # 석유가스, 천연가스 등등 따라서 걸러줘야함
                 if theme_name not in stock.get("themes", []):
                     continue
-
-                # KRX API로 종목명 조회해서 srtn, market 조회
-                krx_stock = get_stock_by_krx(stock_name)
-                # 해당 종목이 없다면 스킵
-                if krx_stock is None:
+                if stock_code is None:
                     continue
 
                 companies.append(
-                    Company(
+                    CompanyBase(
                         name=stock_name,
-                        srtn=krx_stock.srtn,
-                        market=krx_stock.market,
+                        srtnCd=stock_code,
                         reason=None
                     )
                 )

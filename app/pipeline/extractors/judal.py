@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from extractors.base import BaseExtractor
-from models import Company, Theme
+from models import CompanyBase, Theme
 
 SKIP_THEMES: set[str] = set()
 
@@ -64,9 +64,9 @@ class JudalExtractor(BaseExtractor):
 
         return themes
 
-    def extract_theme_stock(self, theme_id: int | None) -> list[Company]:
+    def extract_theme_stock(self, theme_id: int | None) -> list[CompanyBase]:
         url = f"https://www.judal.co.kr/?view=stockList&themeIdx={theme_id}"
-        companies: list[Company] = []
+        companies: list[CompanyBase] = []
 
         try:
             response = requests.get(url, headers=_HEADERS, timeout=10)
@@ -105,7 +105,13 @@ class JudalExtractor(BaseExtractor):
                     )
                     reason = str(raw_reason) if raw_reason is not None else None
 
-                companies.append(Company(name=company_name, market=market, srtn=srtn, reason=reason))
+                companies.append(
+                    CompanyBase(
+                        name=company_name,
+                        srtnCd=srtn,
+                        reason=reason
+                    )
+                )
 
         except Exception as e:
             print(f"❌ themeIdx={theme_id} 처리 중 에러 발생: {e}")
