@@ -16,3 +16,6 @@ CLAUDE.md
 
 # Environment Variables
 .env
+
+# Crawled Datas
+data/
