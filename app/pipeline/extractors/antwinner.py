@@ -1,24 +1,21 @@
-import time
-
-import requests
-
 from extractors.base import BaseExtractor
 from models import Company, Theme
 from utils.krx import get_stock_by_krx
+import requests
+import time
 
 _THEME_KEYWORDS_URL = "https://antwinner.com/api/proxy/theme-keywords"
 _SCREENER_URL = "https://antwinner.com/api/screener"
 
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-
 class AntWinnerExtractor(BaseExtractor):
-    source_name = "antwinner"
+    source_name : str = "antwinner"
 
     def extract_themes(self) -> list[Theme]:
         response = requests.get(_THEME_KEYWORDS_URL, headers=_HEADERS, timeout=10)
         response.raise_for_status()
-        return [Theme(name=name, source="AntWinner") for name in response.json()]
+        return [Theme(name=name, source="antwinner") for name in response.json()]
 
     def extract_theme_stock(self, theme_name: str) -> list[Company]:
         params = {
@@ -34,23 +31,28 @@ class AntWinnerExtractor(BaseExtractor):
             response.raise_for_status()
             data = response.json()
 
-            for s in data.get("stocks", []):
-                srtn = s.get("stock_code", "")
+            for stock in data.get("stocks", []):
+                stock_name = stock["stock_name"]
+
                 # 가스 테마로 검색했을때 가스 라는 키워드가 포함된 모든 테마에 대한 주식이 다 나옴
                 # 석유가스, 천연가스 등등 따라서 걸러줘야함
-                if theme_name not in s.get("themes", []):
+                if theme_name not in stock.get("themes", []):
                     continue
 
-                if len(srtn) < 6:
-                    # stock_code가 없으면 KRX API로 종목명 조회해서 srtn, market 보완
-                    krx_stock = get_stock_by_krx(s["stock_name"])
-                    if krx_stock is None:
-                        continue
-                    srtn = krx_stock.srtn
-                    market = krx_stock.market
-                else:
-                    market = None
-                companies.append(Company(name=s["stock_name"], srtn=srtn, market=market, reason=None))
+                # KRX API로 종목명 조회해서 srtn, market 조회
+                krx_stock = get_stock_by_krx(stock_name)
+                # 해당 종목이 없다면 스킵
+                if krx_stock is None:
+                    continue
+
+                companies.append(
+                    Company(
+                        name=stock_name,
+                        srtn=krx_stock.srtn,
+                        market=krx_stock.market,
+                        reason=None
+                    )
+                )
 
             print(f"✅ [{theme_name}] {len(companies)}개 종목 완료")
 

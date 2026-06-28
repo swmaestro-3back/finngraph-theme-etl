@@ -18,7 +18,6 @@ _HEADERS = {
     )
 }
 
-
 class JudalExtractor(BaseExtractor):
     source_name = "judal"
 
@@ -61,11 +60,11 @@ class JudalExtractor(BaseExtractor):
                     clean_soup = BeautifulSoup(unescaped, "lxml")
                     description = re.sub(r"\s+", " ", clean_soup.get_text(separator=" ").strip())
 
-            themes.append(Theme(name=theme_name, source="Judal", theme_id=theme_id, description=description))
+            themes.append(Theme(name=theme_name, source="judal", theme_id=theme_id, description=description))
 
         return themes
 
-    def extract_theme_stock(self, theme_id: int | None = None, theme_name: str | None = None) -> list[Company]:
+    def extract_theme_stock(self, theme_id: int | None) -> list[Company]:
         url = f"https://www.judal.co.kr/?view=stockList&themeIdx={theme_id}"
         companies: list[Company] = []
 
@@ -76,7 +75,7 @@ class JudalExtractor(BaseExtractor):
             soup = BeautifulSoup(response.text, "lxml")
             th_targets = soup.find_all("th", class_="table-success text-left")
 
-            print(f"[{theme_name}] {len(th_targets)}개 종목 처리 중...")
+            print(f"[themeIdx={theme_id}] {len(th_targets)}개 종목 처리 중...")
 
             for th in th_targets:
                 b_tag = th.find("b")
@@ -108,18 +107,17 @@ class JudalExtractor(BaseExtractor):
 
                 companies.append(Company(name=company_name, market=market, srtn=srtn, reason=reason))
 
-            print(f"✅ [{theme_name}] 완료")
-
         except Exception as e:
-            print(f"❌ themeIdx={theme_id}, theme={theme_name} 처리 중 에러 발생: {e}")
+            print(f"❌ themeIdx={theme_id} 처리 중 에러 발생: {e}")
 
         return companies
 
     def extract(self) -> list[Theme]:
         themes: list[Theme] = self.extract_themes()
 
-        for theme in themes:
-            theme.companies = self.extract_theme_stock(theme_id=theme.theme_id, theme_name=theme.name)
+        for theme in themes[:10]:
+            theme.companies = self.extract_theme_stock(theme_id=theme.theme_id)
+            print(f"✅ [theme_name={theme.name}] 완료")
             time.sleep(1)
 
         print(f"\n총 {len(themes)}개 테마 추출 완료")
