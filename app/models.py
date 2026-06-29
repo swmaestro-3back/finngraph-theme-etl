@@ -53,3 +53,14 @@ class Theme(BaseModel):
     theme_id: int | None = None
     description: str = Field(default="", description="테마 설명 및 개요")
     companies: list[CompanyBase | Company] = Field(default=[], description="해당 테마에 속한 주식 리스트")
+
+class KRXStock(BaseModel):
+    name: str = Field(..., description="주식 종목명", examples=["삼성전자"])
+    srtnCd: str = Field(..., min_length=6, max_length=7, description="KRX 거래소 단축 코드")
+    market: Literal["KOSPI", "KOSDAQ"] = Field(..., description="거래소 구분")
+    clpr: int = Field(..., description="종가")
+    vs: int = Field(..., description="전일대비 등락")
+    fltRt: float = Field(..., description="등락률")
+    trqu: int = Field(..., description="거래량")
+    trPrc: int = Field(..., description="거래대금")
+    mrkTotAmt: int = Field(..., description="시가총액")
