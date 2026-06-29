@@ -1,5 +1,5 @@
 from core.db import neo4j_database
-from models import Theme
+from models import Company, Theme
 
 QUERY = """
 UNWIND $batch AS theme
@@ -10,11 +10,16 @@ ON CREATE SET
     t.source      = theme.source
 WITH t, theme
 UNWIND theme.companies AS company
-MERGE (c:Company {srtn: company.srtn})
-ON CREATE SET
-    c.name   = company.name,
-    c.market = company.market,
-    c.isin   = company.isin
+MERGE (c:Company {srtnCd: company.srtnCd})
+SET
+    c.name       = company.name,
+    c.market     = company.market,
+    c.clpr       = company.clpr,
+    c.vs         = company.vs,
+    c.fltRt      = company.fltRt,
+    c.trqu       = company.trqu,
+    c.trPrc      = company.trPrc,
+    c.mrkTotAmt  = company.mrkTotAmt
 MERGE (c)-[r:BELONGS_TO]->(t)
 ON CREATE SET r.reason = company.reason
 """
@@ -28,12 +33,19 @@ async def load(themes: list[Theme]):
             "source":      theme.source,
             "companies": [
                 {
-                    "name":   c.name,
-                    "market": c.market,
-                    "srtn":   c.srtn,
-                    "reason": c.reason,
+                    "name":      c.name,
+                    "srtnCd":    c.srtnCd,
+                    "reason":    c.reason,
+                    "market":    c.market,
+                    "clpr":      c.clpr,
+                    "vs":        c.vs,
+                    "fltRt":     c.fltRt,
+                    "trqu":      c.trqu,
+                    "trPrc":     c.trPrc,
+                    "mrkTotAmt": c.mrkTotAmt,
                 }
                 for c in theme.companies
+                if isinstance(c, Company)
             ],
         }
         for theme in themes

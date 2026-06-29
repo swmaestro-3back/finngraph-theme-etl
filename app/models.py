@@ -52,4 +52,4 @@ class Theme(BaseModel):
     source: Literal["naver", "judal", "antwinner"]
     theme_id: int | None = None
     description: str = Field(default="", description="테마 설명 및 개요")
-    companies: list[CompanyBase] = Field(default=[], description="해당 테마에 속한 주식 리스트")
+    companies: list[CompanyBase | Company] = Field(default=[], description="해당 테마에 속한 주식 리스트")
