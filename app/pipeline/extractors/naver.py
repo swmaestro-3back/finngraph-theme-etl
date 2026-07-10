@@ -60,7 +60,7 @@ class NaverExtractor(BaseExtractor):
         return themes
 
     def extract_theme_stock(self, theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
-        url = f"{self.BASE_URL}/sise/themeMain.nhn?themeCode={theme_id}"
+        url = f"{self.BASE_URL}/sise/sise_group_detail.naver?type=theme&no={theme_id}"
         companies: list[CompanyBase] = []
         try:
             resp = requests.get(url, headers=self.HEADERS)

@@ -1,6 +1,4 @@
-def main():
-    print("Hello from finngraph-ai!")
-
+# 여기 etl 파이프라인이 있어야함
+# extractor > validator > transformer > loader
 
 if __name__ == "__main__":
-    main()

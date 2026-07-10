@@ -1,13 +1,12 @@
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parents[1]))
 sys.path.insert(0, str(Path(__file__).parents[1] / "app"))
 sys.path.insert(0, str(Path(__file__).parents[1] / "app" / "pipeline"))
 
-from extractors.naver import NaverExtractor
+from app.pipeline.extractors.naver import NaverExtractor
 
 if __name__ == "__main__":
     extractor = NaverExtractor()
-
-    path = extractor.run()
-    print(f"\n저장 완료: {path}")
+    extractor.run()

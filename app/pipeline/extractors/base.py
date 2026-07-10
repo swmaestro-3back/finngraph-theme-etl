@@ -49,7 +49,7 @@ class BaseExtractor(ABC):
         """
         pass
 
-    def save(self, themes: list[Theme]) -> Path:
+    def save(self, themes: list[Theme]):
         """수집된 테마 데이터를 JSON 파일로 저장한다.
 
         저장 경로: {project_root}/data/{오늘날짜}/{source_name}.json
@@ -67,13 +67,14 @@ class BaseExtractor(ABC):
             json.dumps([t.model_dump() for t in themes], ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        print(f"✅ [{self.source_name}] {len(themes)}개 테마 저장 완료: {output}")
         return output
 
-    def run(self) -> Path:
+    def run(self):
         """파이프라인 진입점. 수집 후 저장까지 순서를 보장한다.
 
         Returns:
             저장된 파일의 절대 경로(Path).
         """
         themes = self.extract()
-        return self.save(themes)
+        self.save(themes)
