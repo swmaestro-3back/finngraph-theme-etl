@@ -1,7 +1,7 @@
-from extractors.naver import NaverExtractor
-from extractors.judal import JudalExtractor
-from extractors.antwinner import AntWinnerExtractor
-from extractors.base import BaseExtractor
+from app.extractors.naver import NaverExtractor
+from app.extractors.judal import JudalExtractor
+from app.extractors.antwinner import AntWinnerExtractor
+from app.extractors.base import BaseExtractor
 
 class ExtractorFactory:
     @staticmethod
@@ -13,4 +13,4 @@ class ExtractorFactory:
         elif source_name == "antwinner":
             return AntWinnerExtractor()
         else:
-            return ValueError("Not Available Source Name")
+            raise ValueError("Not Available Source Name")

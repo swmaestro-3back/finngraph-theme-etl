@@ -1,11 +1,11 @@
+import asyncio
 import re
-import time
 
-import requests
 from bs4 import BeautifulSoup
 
-from extractors.base import BaseExtractor
-from models import CompanyBase, Theme
+from app.extractors.base import BaseExtractor
+from app.core import http_client
+from app.models import CompanyBase, Theme
 
 class NaverExtractor(BaseExtractor):
     """
@@ -23,49 +23,49 @@ class NaverExtractor(BaseExtractor):
         "Accept-Encoding": "gzip, deflate",
     }
 
-    def extract_themes(self) -> list[Theme]:
+    async def extract_themes(self) -> list[Theme]:
         themes: list[Theme] = []
+        session = http_client.get_session()
         for pagenum in range(1, 8):
-            if pagenum == 2:
-                break
             url = f"{self.BASE_URL}/sise/theme.naver?&page={pagenum}"
 
             # EUC-KR로 인코딩해서 보내주므로 EUC-KR로 디코딩해야함
-            resp = requests.get(url, headers=self.HEADERS)
-            resp.encoding = "euc-kr"
+            async with session.get(url, headers=self.HEADERS) as resp:
+                text = await resp.text(encoding="euc-kr")
 
-            soup = BeautifulSoup(resp.text, "lxml")
+            soup = BeautifulSoup(text, "lxml")
             for a in soup.select("#contentarea_left > table.type_1.theme > tr > td.col_type1 > a"):
                 theme_name = a.text.strip()
                 href = str(a["href"])
-                theme_id = None
+                source_theme_id = None
                 match = re.search(r"no=(\d+)", href)
                 if match:
-                    theme_id = int(match.group(1))
+                    source_theme_id = int(match.group(1))
 
                 description = ""
                 try:
-                    detail_resp = requests.get(f"{self.BASE_URL}{href}", headers=self.HEADERS)
-                    detail_resp.encoding = "euc-kr"
-                    detail_soup = BeautifulSoup(detail_resp.text, "lxml")
+                    async with session.get(f"{self.BASE_URL}{href}", headers=self.HEADERS) as detail_resp:
+                        detail_text = await detail_resp.text(encoding="euc-kr")
+                    detail_soup = BeautifulSoup(detail_text, "lxml")
                     info_tag = detail_soup.select_one("div.info_layer_wrap > p.info_txt")
                     if info_tag:
                         description = info_tag.text.strip()
                 except Exception:
                     pass
 
-                themes.append(Theme(name=theme_name, source="naver", theme_id=theme_id, description=description))
+                themes.append(Theme(name=theme_name, source="naver", source_theme_id=source_theme_id, description=description))
                 print(f"✅ [{theme_name}] 테마 추출 완료")
-                time.sleep(0.5)
+                await asyncio.sleep(0.5)
         return themes
 
-    def extract_theme_stock(self, theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
-        url = f"{self.BASE_URL}/sise/sise_group_detail.naver?type=theme&no={theme_id}"
+    async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
+        url = f"{self.BASE_URL}/sise/sise_group_detail.naver?type=theme&no={source_theme_id}"
         companies: list[CompanyBase] = []
         try:
-            resp = requests.get(url, headers=self.HEADERS)
-            resp.encoding = "euc-kr"
-            soup = BeautifulSoup(resp.text, "lxml")
+            session = http_client.get_session()
+            async with session.get(url, headers=self.HEADERS) as resp:
+                text = await resp.text(encoding="euc-kr")
+            soup = BeautifulSoup(text, "lxml")
             # 전체 테이블의 tr 파싱
             for tr in soup.select("#contentarea > div:nth-child(5) > table > tbody > tr"):
                 # 주식명과 종목코드 파싱
@@ -88,16 +88,16 @@ class NaverExtractor(BaseExtractor):
             print(f"✅ [{theme_name}] {len(companies)}개 종목 완료")
 
         except Exception as e:
-            print(f"❌ themeCode={theme_id}, theme={theme_name} 처리 중 에러 발생: {e}")
+            print(f"❌ themeCode={source_theme_id}, theme={theme_name} 처리 중 에러 발생: {e}")
 
         return companies
 
-    def extract(self) -> list[Theme]:
-        themes: list[Theme] = self.extract_themes()
+    async def extract(self) -> list[Theme]:
+        themes: list[Theme] = await self.extract_themes()
 
-        for theme in themes[:5]:
-            theme.companies = self.extract_theme_stock(theme_id=theme.theme_id, theme_name=theme.name)
-            time.sleep(1)
+        for theme in themes:
+            theme.companies = await self.extract_theme_stock(source_theme_id=theme.source_theme_id, theme_name=theme.name)
+            await asyncio.sleep(1)
 
         print(f"\n총 {len(themes)}개 테마 추출 완료")
         return themes

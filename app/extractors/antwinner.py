@@ -1,7 +1,7 @@
-from extractors.base import BaseExtractor
-from models import CompanyBase, Theme
-import requests
-import time
+from app.extractors.base import BaseExtractor
+from app.models import CompanyBase, Theme
+from app.core import http_client
+import asyncio
 
 _THEME_KEYWORDS_URL = "https://antwinner.com/api/proxy/theme-keywords"
 _SCREENER_URL = "https://antwinner.com/api/screener"
@@ -11,12 +11,14 @@ _HEADERS = {"User-Agent": "Mozilla/5.0"}
 class AntWinnerExtractor(BaseExtractor):
     source_name : str = "antwinner"
 
-    def extract_themes(self) -> list[Theme]:
-        response = requests.get(_THEME_KEYWORDS_URL, headers=_HEADERS, timeout=10)
-        response.raise_for_status()
-        return [Theme(name=name, source="antwinner") for name in response.json()]
+    async def extract_themes(self) -> list[Theme]:
+        session = http_client.get_session()
+        async with session.get(_THEME_KEYWORDS_URL, headers=_HEADERS, timeout=10) as response:
+            response.raise_for_status()
+            names = await response.json()
+        return [Theme(name=name, source="antwinner") for name in names]
 
-    def extract_theme_stock(self, theme_name: str) -> list[CompanyBase]:
+    async def extract_theme_stock(self, theme_name: str) -> list[CompanyBase]:
         params = {
             "period": "this-week",
             "rateFilter": "all",
@@ -26,9 +28,10 @@ class AntWinnerExtractor(BaseExtractor):
         companies: list[CompanyBase] = []
 
         try:
-            response = requests.get(_SCREENER_URL, params=params, headers=_HEADERS, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            session = http_client.get_session()
+            async with session.get(_SCREENER_URL, params=params, headers=_HEADERS, timeout=10) as response:
+                response.raise_for_status()
+                data = await response.json()
 
             for stock in data.get("stocks", []):
                 stock_name = stock["stock_name"]
@@ -56,12 +59,12 @@ class AntWinnerExtractor(BaseExtractor):
 
         return companies
 
-    def extract(self) -> list[Theme]:
-        themes: list[Theme] = self.extract_themes()
+    async def extract(self) -> list[Theme]:
+        themes: list[Theme] = await self.extract_themes()
         for theme in themes:
-            theme.companies = self.extract_theme_stock(theme.name)
+            theme.companies = await self.extract_theme_stock(theme.name)
             # 429 Client Error Rate Limiting 방지
-            time.sleep(2)
+            await asyncio.sleep(2)
 
         print(f"\n총 {len(themes)}개 테마 추출 완료")
         return themes

@@ -2,32 +2,34 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import date
 import json
-from models import Theme, CompanyBase
+from app.models import Theme, CompanyBase
 
-_DATA_ROOT = Path(__file__).parents[3] / "data"
+_DATA_ROOT = Path(__file__).parents[2] / "data"
 
 class BaseExtractor(ABC):
 
     source_name: str
-
+    blacklist: list[str] = [
+        "2026 상반기 신규상장", "2026 하반기 신규상장",
+    ]
     @abstractmethod
-    def extract_themes(self) -> list[Theme]:
+    async def extract_themes(self) -> list[Theme]:
         """소스에서 테마 목록만 추출한다 (종목 정보 미포함).
 
         companies 필드가 빈 상태의 경량 Theme 객체를 반환하며,
         전체 파이프라인의 첫 번째 단계로 사용된다.
 
         Returns:
-            companies가 빈 list[Theme]. theme_id가 없는 소스는 None으로 설정된다.
+            companies가 빈 list[Theme]. source_theme_id가 없는 소스는 None으로 설정된다.
         """
         pass
 
     @abstractmethod
-    def extract_theme_stock(self, theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
+    async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
         """특정 테마에 속한 종목 목록을 추출한다.
 
         Args:
-            theme_id: 소스에서 사용하는 테마 고유 ID. ID 기반 조회를 지원하지 않는
+            source_theme_id: 소스에서 사용하는 테마 고유 ID. ID 기반 조회를 지원하지 않는
                 소스(e.g. AntWinner)는 None으로 전달한다.
             theme_name: 테마명. ID가 없는 소스에서 조회 키로 사용되며,
                 로깅 및 디버깅 목적으로도 활용된다.
@@ -38,7 +40,7 @@ class BaseExtractor(ABC):
         pass
 
     @abstractmethod
-    def extract(self) -> list[Theme]:
+    async def extract(self) -> list[Theme]:
         """테마 목록과 각 테마의 종목을 모두 수집하여 완성된 데이터를 반환한다.
 
         extract_themes로 테마 목록을 가져온 뒤, 각 테마에 대해
@@ -70,11 +72,11 @@ class BaseExtractor(ABC):
         print(f"✅ [{self.source_name}] {len(themes)}개 테마 저장 완료: {output}")
         return output
 
-    def run(self):
+    async def run(self):
         """파이프라인 진입점. 수집 후 저장까지 순서를 보장한다.
 
         Returns:
             저장된 파일의 절대 경로(Path).
         """
-        themes = self.extract()
+        themes = await self.extract()
         self.save(themes)

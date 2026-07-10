@@ -1,6 +1,6 @@
-from neo4j import AsyncGraphDatabase, AsyncSession
-from typing import AsyncGenerator
-from contextlib import asynccontextmanager
+from neo4j import AsyncGraphDatabase, Record
+from typing import Optional, LiteralString
+from app.core.configs import settings
 
 # BoltDriver
 # It addresses a single database machine. This may be a standalone server or could be a specific member of a cluster.
@@ -15,9 +15,12 @@ class Neo4jDatabase:
         self._driver = None
 
     # URI에 맞는 Driver 생성 (BoltDriver 또는 Neo4jDriver)
-    def init_driver(self, uri: str, auth: tuple):
+    def init_driver(self):
         try:
-            self._driver = AsyncGraphDatabase.driver(uri, auth=auth)
+            self._driver = AsyncGraphDatabase.driver(
+                uri=settings.NEO4J_URI,
+                auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD)
+            )
         except Exception as e:
             raise e
     
@@ -25,20 +28,18 @@ class Neo4jDatabase:
         if self._driver:
             await self._driver.close()
 
-    @asynccontextmanager
-    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+    async def execute(self, query: LiteralString, parameters: Optional[dict] = None) -> list[Record]:
         if not self._driver:
             raise RuntimeError("Neo4j Driver is not initialized. Call init_driver first.")
         
-        session = self._driver.session()
+        records, _, _ = await self._driver.execute_query(
+            query,
+            parameters_=parameters,
+            database_=settings.NEO4J_DATABASE
+        )
 
-        try:
-            # yield 함수를 만나는 순간
-            # 일시정지 후 session 객체 반환하면서 제어권 넘기기
-            yield session
-        # get_session을 호출한 부모함수가 종료되면 다시 재개되며 finally 블록 실행
-        finally:
-            await session.close()
+        # 원래 records, summary, keys 이렇게 3개 주는데 지금은 쿼리 결과인 records만 사용하니 나머지는 버리는 용으로 _ 표기
+        return records
 
 # 전역적으로 하나의 객체만 사용
 # 싱글톤 패턴 적용
