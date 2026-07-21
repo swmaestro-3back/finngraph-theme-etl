@@ -1,5 +1,9 @@
+import logging
+
 from app.crud.themes import upsert_themes
 from app.models import Theme
+
+logger = logging.getLogger(__name__)
 
 async def load(themes: list[Theme]):
     theme_batch = [
@@ -9,7 +13,7 @@ async def load(themes: list[Theme]):
             "description":     theme.description,
             "source":          theme.source,
             "companies": [
-                {"srtnCd": c.srtnCd, "reason": c.reason}
+                {"ticker": c.ticker, "reason": c.reason}
                 for c in theme.companies
             ],
         }
@@ -18,4 +22,4 @@ async def load(themes: list[Theme]):
 
     await upsert_themes(theme_batch)
 
-    print(f"✅ {len(themes)}개 Theme 및 BELONGS_TO 관계 적재 완료")
+    logger.info(f"{len(themes)}개 Theme 및 BELONGS_TO 관계 적재 완료")

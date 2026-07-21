@@ -3,8 +3,8 @@ from typing import Literal
 
 class Company(BaseModel):
     name: str = Field(..., description="주식 종목명", examples=["삼성전자"])
-    # srtnCd는 validator에서 기존 Neo4j를 바탕으로 옳은 srtnCd인지 검증한다
-    srtnCd: str = Field(..., min_length=6, max_length=7, description="KRX 거래소 단축 코드")
+    # ticker는 validator에서 기존 Neo4j를 바탕으로 옳은 ticker인지 검증한다
+    ticker: str = Field(..., min_length=6, max_length=7, description="KRX 거래소 단축 코드")
     reason: str | None = Field(None, description="테마 편입 이유 (추후 테마-주식 간 Relationship 설정 시 사용)")
 
 class Theme(BaseModel):
