@@ -1,11 +1,39 @@
+import logging
 import re
 
-from app.crud.themes import fetch_theme_stock_map, theme_exists
+from app.crud.themes import fetch_company_ticker_by_names, fetch_theme_stock_map, theme_exists
 from app.models import Company, Theme
+
+logger = logging.getLogger(__name__)
 
 CONTAINMENT_OVERLAP_THRESHOLD = 0.9
 MIN_STOCKS_FOR_CONTAINMENT = 5
 MIN_CONTAINMENT_NAME_LENGTH = 2
+
+async def validate_company(themes: list[Theme]) -> list[Theme]:
+    """
+    크롤링한 COMPANY 데이터와 Neo4j의 COMPANY 데이터와 일치하는지 대조하여 검증한다.
+    
+    1. name의 기업이 Neo4j에 없으면 해당 종목 제외
+    2. name은 있으나 크롤링한 ticker와 Neo4j의 ticker가 다르면 해당 종목 제외
+    """
+    names = {c.name for theme in themes for c in theme.companies}
+    name_to_ticker = await fetch_company_ticker_by_names(list(names))
+
+    for theme in themes:
+        resolved = []
+        for c in theme.companies:
+            ticker = name_to_ticker.get(c.name)
+            if ticker is None:
+                logger.warning(f"[{theme.name}] '{c.name}' Neo4j에 존재하지 않아 제외합니다.")
+                continue
+            if c.ticker != ticker:
+                logger.warning(f"[{theme.name}] '{c.name}' ticker 불일치 (크롤링={c.ticker}, Neo4j={ticker}) 제외합니다.")
+                continue
+            resolved.append(c)
+        theme.companies = resolved
+
+    return themes
 
 def _normalize_name(name: str) -> str:
     """공백 표기 차이(예: "2차 전지" vs "2차전지")로 인한 미매칭을 막기 위해 모든 공백을 제거한다."""
@@ -46,11 +74,10 @@ def _find_duplicate_name(theme: Theme, candidate_stocks: set[str], name_to_stock
 
     return None
 
-
-async def validate(themes: list[Theme]) -> list[Theme]:
+async def validate_theme(themes: list[Theme]) -> list[Theme]:
     """
-    transform과 load 사이에서 사용.
-
+    크롤링한 THEME이 이미 Neo4j에 존재하는 THEME인지 검증한다.
+    
     이름이 동일하거나, 이름이 포함 관계(예: "반도체" ⊂ "반도체소재")이면서
     종목이 CONTAINMENT_OVERLAP_THRESHOLD 이상 겹치는 테마는 새 노드를 만들지 않고
     기존(Neo4j) 또는 같은 배치 내 먼저 발견된 테마로 종목을 병합한다.
@@ -63,7 +90,7 @@ async def validate(themes: list[Theme]) -> list[Theme]:
     merged_stocks: dict[str, set[str]] = {}
 
     for theme in themes:
-        candidate_stocks = {c.srtnCd for c in theme.companies if isinstance(c, Company)}
+        candidate_stocks = {c.ticker for c in theme.companies if isinstance(c, Company)}
 
         dup_name = _find_duplicate_name(theme, candidate_stocks, merged_stocks)
         if dup_name is None:
@@ -78,19 +105,26 @@ async def validate(themes: list[Theme]) -> list[Theme]:
             target = merged[dup_name]
             target_srtn = merged_stocks[dup_name]
             for c in theme.companies:
-                if isinstance(c, Company) and c.srtnCd not in target_srtn:
+                if isinstance(c, Company) and c.ticker not in target_srtn:
                     target.companies.append(c)
-                    target_srtn.add(c.srtnCd)
-            print(f"🔗 [{theme.name}] → [{dup_name}] 배치 내 테마로 병합 (병합 종목 {len(candidate_stocks)}개, 최종 종목 {len(target_srtn)}개)")
+                    target_srtn.add(c.ticker)
+            logger.info(f"[{theme.name}] -> [{dup_name}] 배치 내 테마로 병합 (병합 종목 {len(candidate_stocks)}개, 최종 종목 {len(target_srtn)}개)")
         else:
             # Neo4j에 이미 있는 테마와 병합: 이름을 기존 테마명으로 맞춰서
             # loader의 MERGE (t:Theme {name: ...})가 같은 노드에 종목을 붙이게 한다.
             merged_srtn = existing_stocks[dup_name] | candidate_stocks
-            print(f"🔗 [{theme.name}] Neo4j 기존 테마 [{dup_name}]에 병합 (병합 종목 {len(candidate_stocks)}개, 최종 종목 {len(merged_srtn)}개)")
+            logger.info(f"[{theme.name}] Neo4j 기존 테마 [{dup_name}]에 병합 (병합 종목 {len(candidate_stocks)}개, 최종 종목 {len(merged_srtn)}개)")
             theme.name = dup_name
             merged[dup_name] = theme
             merged_stocks[dup_name] = merged_srtn
 
     accepted = list(merged.values())
-    print(f"✅ {len(themes)}개 테마 → {len(accepted)}개로 병합 완료")
+    logger.info(f"{len(themes)}개 테마 -> {len(accepted)}개로 병합 완료")
     return accepted
+
+
+async def validate(themes: list[Theme]) -> list[Theme]:
+    """extract와 load 사이에서 사용. company 검증 후 theme 병합 순으로 수행한다."""
+    themes = await validate_company(themes)
+    themes = await validate_theme(themes)
+    return themes
