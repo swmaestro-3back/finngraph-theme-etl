@@ -2,7 +2,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import date
 import json
+import logging
 from app.models import Theme, Company
+
+logger = logging.getLogger(__name__)
 
 _DATA_ROOT = Path(__file__).parents[2] / "data"
 
@@ -52,7 +55,7 @@ class BaseExtractor(ABC):
             json.dumps([t.model_dump() for t in themes], ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        print(f"✅ [{self.source_name}] {len(themes)}개 테마 저장 완료: {output}")
+        logger.info(f"[{self.source_name}] {len(themes)}개 테마 저장 완료: {output}")
         return output
 
     async def run(self):

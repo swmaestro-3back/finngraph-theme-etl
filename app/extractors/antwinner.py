@@ -2,6 +2,9 @@ from app.extractors.base import BaseExtractor
 from app.models import Company, Theme
 from app.core import http_client
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 _THEME_KEYWORDS_URL = "https://antwinner.com/api/proxy/theme-keywords"
 _SCREENER_URL = "https://antwinner.com/api/screener"
@@ -44,21 +47,21 @@ class AntWinnerExtractor(BaseExtractor):
                 # 석유가스, 천연가스 등등 따라서 걸러줘야함
                 if theme_name not in stock.get("themes", []):
                     continue
-                if stock_code is None:
+                if not stock_code:
                     continue
 
                 companies.append(
                     Company(
                         name=stock_name,
-                        srtnCd=stock_code,
+                        ticker=stock_code,
                         reason=None
                     )
                 )
 
-            print(f"✅ [{theme_name}] {len(companies)}개 종목 완료")
+            logger.debug(f"[{theme_name}] {len(companies)}개 종목 완료")
 
-        except Exception as e:
-            print(f"❌ theme={theme_name} 처리 중 에러 발생: {e}")
+        except Exception:
+            logger.exception(f"theme={theme_name} 처리 중 에러 발생")
 
         return companies
 
@@ -69,5 +72,5 @@ class AntWinnerExtractor(BaseExtractor):
             # 429 Client Error Rate Limiting 방지
             await asyncio.sleep(2)
 
-        print(f"\n총 {len(themes)}개 테마 추출 완료")
+        logger.info(f"총 {len(themes)}개 테마 추출 완료")
         return themes

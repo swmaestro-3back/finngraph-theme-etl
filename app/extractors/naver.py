@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 
 from bs4 import BeautifulSoup
@@ -7,6 +8,8 @@ from app.extractors.base import BaseExtractor
 from app.core import http_client
 from app.models import Company, Theme
 
+logger = logging.getLogger(__name__)
+
 class NaverExtractor(BaseExtractor):
     """
     네이버 증권은 UTF-8이 아닌 2000년대 초반 EUC-KO로 인코딩하여 보내줌
@@ -14,7 +17,7 @@ class NaverExtractor(BaseExtractor):
     """
     source_name = "naver"
     blacklist = [
-        "2026 상반기 신규상장", "2026 하반기 신규상장", "기업인수목적회사(SPAC)", "리츠(REITs)"
+        "2026 상반기 신규상장", "2026 하반기 신규상장", "기업인수목적회사(SPAC)", "리츠(REITs)", "S7(삼성전자/SK하이닉스 등)", "S7"
     ]
 
     BASE_URL = "https://finance.naver.com"
@@ -67,8 +70,8 @@ class NaverExtractor(BaseExtractor):
                     pass
 
                 themes.append(Theme(name=theme_name, source="naver", source_theme_id=source_theme_id, description=description))
-                print(f"✅ [{theme_name}] 테마 추출 완료")
-                await asyncio.sleep(0.5)
+                logger.debug(f"[{theme_name}] 테마 추출 완료")
+                # await asyncio.sleep(0)
         return themes
 
     async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[Company]:
@@ -91,17 +94,19 @@ class NaverExtractor(BaseExtractor):
 
                 name = a.text.strip()
                 srtn = href.split("code=")[-1].strip()
+                if not srtn:
+                    continue
 
                 # 테마 편입 이유 파싱
                 reason_tag = tr.select_one("div.info_layer_wrap > p.info_txt")
                 reason = reason_tag.text.strip() if reason_tag else None
 
-                companies.append(Company(name=name, srtnCd=srtn, reason=reason))
+                companies.append(Company(name=name, ticker=srtn, reason=reason))
 
-            print(f"✅ [{theme_name}] {len(companies)}개 종목 완료")
+            logger.debug(f"[{theme_name}] {len(companies)}개 종목 완료")
 
-        except Exception as e:
-            print(f"❌ themeCode={source_theme_id}, theme={theme_name} 처리 중 에러 발생: {e}")
+        except Exception:
+            logger.exception(f"themeCode={source_theme_id}, theme={theme_name} 처리 중 에러 발생")
 
         return companies
 
@@ -110,7 +115,7 @@ class NaverExtractor(BaseExtractor):
 
         for theme in themes:
             theme.companies = await self.extract_theme_stock(source_theme_id=theme.source_theme_id, theme_name=theme.name)
-            await asyncio.sleep(1)
+            # await asyncio.sleep(1)
 
-        print(f"\n총 {len(themes)}개 테마 추출 완료")
+        logger.info(f"총 {len(themes)}개 테마 추출 완료")
         return themes

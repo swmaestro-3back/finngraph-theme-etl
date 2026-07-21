@@ -1,5 +1,6 @@
 import asyncio
 import html
+import logging
 import re
 
 from bs4 import BeautifulSoup
@@ -7,6 +8,8 @@ from bs4 import BeautifulSoup
 from app.extractors.base import BaseExtractor
 from app.core import http_client
 from app.models import Company, Theme
+
+logger = logging.getLogger(__name__)
 
 _HEADERS = {
     "User-Agent": (
@@ -81,7 +84,7 @@ class JudalExtractor(BaseExtractor):
             soup = BeautifulSoup(text, "lxml")
             th_targets = soup.find_all("th", class_="table-success text-left")
 
-            print(f"[themeIdx={source_theme_id}] {len(th_targets)}개 종목 처리 중...")
+            logger.debug(f"[themeIdx={source_theme_id}] {len(th_targets)}개 종목 처리 중...")
 
             for th in th_targets:
                 b_tag = th.find("b")
@@ -98,7 +101,7 @@ class JudalExtractor(BaseExtractor):
                     elif part.isdigit():
                         srtn = part
 
-                if srtn is None or market not in ("KOSPI", "KOSDAQ"):
+                if not srtn or market not in ("KOSPI", "KOSDAQ"):
                     continue
 
                 button_tag = th.find("button")
@@ -114,13 +117,13 @@ class JudalExtractor(BaseExtractor):
                 companies.append(
                     Company(
                         name=company_name,
-                        srtnCd=srtn,
+                        ticker=srtn,
                         reason=reason
                     )
                 )
 
-        except Exception as e:
-            print(f"❌ themeIdx={source_theme_id} 처리 중 에러 발생: {e}")
+        except Exception:
+            logger.exception(f"themeIdx={source_theme_id} 처리 중 에러 발생")
 
         return companies
 
@@ -129,8 +132,8 @@ class JudalExtractor(BaseExtractor):
 
         for theme in themes:
             theme.companies = await self.extract_theme_stock(source_theme_id=theme.source_theme_id)
-            print(f"✅ [theme_name={theme.name}] 완료")
+            logger.debug(f"[theme_name={theme.name}] 완료")
             await asyncio.sleep(1)
 
-        print(f"\n총 {len(themes)}개 테마 추출 완료")
+        logger.info(f"총 {len(themes)}개 테마 추출 완료")
         return themes
