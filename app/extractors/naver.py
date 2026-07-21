@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 from app.extractors.base import BaseExtractor
 from app.core import http_client
-from app.models import CompanyBase, Theme
+from app.models import Company, Theme
 
 class NaverExtractor(BaseExtractor):
     """
@@ -13,6 +13,10 @@ class NaverExtractor(BaseExtractor):
     따라서 받은 Response를 현대적인 UTF-8로 인코딩을 하면 안되고 EUC-KO로 디코딩을 해야함
     """
     source_name = "naver"
+    blacklist = [
+        "2026 상반기 신규상장", "2026 하반기 신규상장", "기업인수목적회사(SPAC)", "리츠(REITs)"
+    ]
+
     BASE_URL = "https://finance.naver.com"
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36",
@@ -23,7 +27,11 @@ class NaverExtractor(BaseExtractor):
         "Accept-Encoding": "gzip, deflate",
     }
 
-    async def extract_themes(self) -> list[Theme]:
+    async def fetch_themes(self) -> list[Theme]:
+        """
+        테마명 크롤링
+        블랙리스트에 제거된 테마들만 크롤링
+        """
         themes: list[Theme] = []
         session = http_client.get_session()
         for pagenum in range(1, 8):
@@ -36,6 +44,11 @@ class NaverExtractor(BaseExtractor):
             soup = BeautifulSoup(text, "lxml")
             for a in soup.select("#contentarea_left > table.type_1.theme > tr > td.col_type1 > a"):
                 theme_name = a.text.strip()
+                
+                # 테마 이름이 블랙리스트에 있다면 스킵
+                if theme_name in self.blacklist:
+                    continue
+
                 href = str(a["href"])
                 source_theme_id = None
                 match = re.search(r"no=(\d+)", href)
@@ -58,9 +71,9 @@ class NaverExtractor(BaseExtractor):
                 await asyncio.sleep(0.5)
         return themes
 
-    async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
+    async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[Company]:
         url = f"{self.BASE_URL}/sise/sise_group_detail.naver?type=theme&no={source_theme_id}"
-        companies: list[CompanyBase] = []
+        companies: list[Company] = []
         try:
             session = http_client.get_session()
             async with session.get(url, headers=self.HEADERS) as resp:
@@ -83,7 +96,7 @@ class NaverExtractor(BaseExtractor):
                 reason_tag = tr.select_one("div.info_layer_wrap > p.info_txt")
                 reason = reason_tag.text.strip() if reason_tag else None
 
-                companies.append(CompanyBase(name=name, srtnCd=srtn, reason=reason))
+                companies.append(Company(name=name, srtnCd=srtn, reason=reason))
 
             print(f"✅ [{theme_name}] {len(companies)}개 종목 완료")
 
@@ -93,7 +106,7 @@ class NaverExtractor(BaseExtractor):
         return companies
 
     async def extract(self) -> list[Theme]:
-        themes: list[Theme] = await self.extract_themes()
+        themes: list[Theme] = await self.fetch_themes()
 
         for theme in themes:
             theme.companies = await self.extract_theme_stock(source_theme_id=theme.source_theme_id, theme_name=theme.name)

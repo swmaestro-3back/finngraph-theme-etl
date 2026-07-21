@@ -6,9 +6,7 @@ from bs4 import BeautifulSoup
 
 from app.extractors.base import BaseExtractor
 from app.core import http_client
-from app.models import CompanyBase, Theme
-
-SKIP_THEMES: set[str] = set()
+from app.models import Company, Theme
 
 _HEADERS = {
     "User-Agent": (
@@ -20,8 +18,11 @@ _HEADERS = {
 
 class JudalExtractor(BaseExtractor):
     source_name = "judal"
+    blacklist = [
+        "코스닥 퇴출기준", "지방코스닥기업", "상장폐지 위험종목", "ETF", "ETN"
+    ]
 
-    async def extract_themes(self) -> list[Theme]:
+    async def fetch_themes(self) -> list[Theme]:
         url = "https://www.judal.co.kr/?view=themeList"
         session = http_client.get_session()
         async with session.get(url, headers=_HEADERS, timeout=10) as response:
@@ -39,8 +40,9 @@ class JudalExtractor(BaseExtractor):
 
             b_tag = a_tag.find("b")
             theme_name = b_tag.text.strip() if b_tag else a_tag.text.strip()
-
-            if theme_name in SKIP_THEMES:
+            
+            # 테마 이름이 블랙리스트에 있다면 스킵
+            if theme_name in self.blacklist:
                 continue
 
             source_theme_id = None
@@ -66,9 +68,9 @@ class JudalExtractor(BaseExtractor):
 
         return themes
 
-    async def extract_theme_stock(self, source_theme_id: int | None) -> list[CompanyBase]:
+    async def extract_theme_stock(self, source_theme_id: int | None) -> list[Company]:
         url = f"https://www.judal.co.kr/?view=stockList&themeIdx={source_theme_id}"
-        companies: list[CompanyBase] = []
+        companies: list[Company] = []
 
         try:
             session = http_client.get_session()
@@ -110,7 +112,7 @@ class JudalExtractor(BaseExtractor):
                     reason = str(raw_reason) if raw_reason is not None else None
 
                 companies.append(
-                    CompanyBase(
+                    Company(
                         name=company_name,
                         srtnCd=srtn,
                         reason=reason
@@ -123,7 +125,7 @@ class JudalExtractor(BaseExtractor):
         return companies
 
     async def extract(self) -> list[Theme]:
-        themes: list[Theme] = await self.extract_themes()
+        themes: list[Theme] = await self.fetch_themes()
 
         for theme in themes:
             theme.companies = await self.extract_theme_stock(source_theme_id=theme.source_theme_id)

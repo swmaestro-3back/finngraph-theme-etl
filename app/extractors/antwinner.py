@@ -1,5 +1,5 @@
 from app.extractors.base import BaseExtractor
-from app.models import CompanyBase, Theme
+from app.models import Company, Theme
 from app.core import http_client
 import asyncio
 
@@ -9,23 +9,26 @@ _SCREENER_URL = "https://antwinner.com/api/screener"
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 class AntWinnerExtractor(BaseExtractor):
-    source_name : str = "antwinner"
+    source_name: str = "antwinner"
+    blacklist = ["하락장"]
 
-    async def extract_themes(self) -> list[Theme]:
+    async def fetch_themes(self) -> list[Theme]:
         session = http_client.get_session()
         async with session.get(_THEME_KEYWORDS_URL, headers=_HEADERS, timeout=10) as response:
             response.raise_for_status()
             names = await response.json()
-        return [Theme(name=name, source="antwinner") for name in names]
+        
+        # 블랙리스트에 있는 테마를 제외하고 반환
+        return [Theme(name=name, source="antwinner") for name in names if name not in self.blacklist]
 
-    async def extract_theme_stock(self, theme_name: str) -> list[CompanyBase]:
+    async def extract_theme_stock(self, theme_name: str) -> list[Company]:
         params = {
             "period": "this-week",
             "rateFilter": "all",
             "sortBy": "rate",
             "themes": theme_name,
         }
-        companies: list[CompanyBase] = []
+        companies: list[Company] = []
 
         try:
             session = http_client.get_session()
@@ -45,7 +48,7 @@ class AntWinnerExtractor(BaseExtractor):
                     continue
 
                 companies.append(
-                    CompanyBase(
+                    Company(
                         name=stock_name,
                         srtnCd=stock_code,
                         reason=None
@@ -60,7 +63,7 @@ class AntWinnerExtractor(BaseExtractor):
         return companies
 
     async def extract(self) -> list[Theme]:
-        themes: list[Theme] = await self.extract_themes()
+        themes: list[Theme] = await self.fetch_themes()
         for theme in themes:
             theme.companies = await self.extract_theme_stock(theme.name)
             # 429 Client Error Rate Limiting 방지

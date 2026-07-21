@@ -2,52 +2,35 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import date
 import json
-from app.models import Theme, CompanyBase
+from app.models import Theme, Company
 
 _DATA_ROOT = Path(__file__).parents[2] / "data"
 
 class BaseExtractor(ABC):
 
-    source_name: str
-    blacklist: list[str] = [
-        "2026 상반기 신규상장", "2026 하반기 신규상장",
-    ]
+    source_name: str      # 크롤링 도메인 이름
+    blacklist: list[str]  # 테마 블랙리스트
+
     @abstractmethod
-    async def extract_themes(self) -> list[Theme]:
-        """소스에서 테마 목록만 추출한다 (종목 정보 미포함).
-
-        companies 필드가 빈 상태의 경량 Theme 객체를 반환하며,
-        전체 파이프라인의 첫 번째 단계로 사용된다.
-
-        Returns:
-            companies가 빈 list[Theme]. source_theme_id가 없는 소스는 None으로 설정된다.
+    async def fetch_themes(self) -> list[Theme]:
+        """
+        테마명 크롤링
+        블랙리스트에 제거된 테마들만 크롤링
         """
         pass
 
     @abstractmethod
-    async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[CompanyBase]:
-        """특정 테마에 속한 종목 목록을 추출한다.
-
-        Args:
-            source_theme_id: 소스에서 사용하는 테마 고유 ID. ID 기반 조회를 지원하지 않는
-                소스(e.g. AntWinner)는 None으로 전달한다.
-            theme_name: 테마명. ID가 없는 소스에서 조회 키로 사용되며,
-                로깅 및 디버깅 목적으로도 활용된다.
-
-        Returns:
-            해당 테마에 속한 list[Company]. 조회 실패 시 빈 리스트를 반환한다.
+    async def extract_theme_stock(self, source_theme_id: int | None = None, theme_name: str | None = None) -> list[Company]:
+        """
+        특정 테마에 대한 종목 크롤링
+        fetch_themes 이후에 실행된다
         """
         pass
 
     @abstractmethod
     async def extract(self) -> list[Theme]:
-        """테마 목록과 각 테마의 종목을 모두 수집하여 완성된 데이터를 반환한다.
-
-        extract_themes로 테마 목록을 가져온 뒤, 각 테마에 대해
-        extract_theme_stock을 호출하여 companies를 채운다.
-
-        Returns:
-            companies가 채워진 list[Theme].
+        """
+        fetch_themes와 extract_theme_stock을 실행하는 extract 메서드
         """
         pass
 
