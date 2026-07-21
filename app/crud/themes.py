@@ -28,6 +28,18 @@ RETURN c.srtnCd AS srtnCd
     )
     return {r["srtnCd"] for r in records}
 
+async def fetch_company_srtn_by_names(names: list[str]) -> dict[str, str]:
+    """name으로 기존 Neo4j Company를 조회해 name -> srtnCd 매핑을 반환한다."""
+    records = await neo4j_database.execute(
+        """
+UNWIND $names AS name
+MATCH (c:Company {name: name})
+RETURN c.name AS name, c.srtnCd AS srtnCd
+""",
+        parameters={"names": names},
+    )
+    return {r["name"]: r["srtnCd"] for r in records}
+
 async def upsert_companies(company_batch: list[dict]) -> None:
     await neo4j_database.execute(
         """

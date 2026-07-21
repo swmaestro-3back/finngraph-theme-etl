@@ -1,22 +1,7 @@
-from app.crud.themes import upsert_companies, upsert_themes
-from app.models import Company, Theme
+from app.crud.themes import upsert_themes
+from app.models import Theme
 
-async def load(themes: list[Theme], companies: list[Company]):
-    company_batch = [
-        {
-            "name":      c.name,
-            "srtnCd":    c.srtnCd,
-            "market":    c.market,
-            "clpr":      c.clpr,
-            "vs":        c.vs,
-            "fltRt":     c.fltRt,
-            "trqu":      c.trqu,
-            "trPrc":     c.trPrc,
-            "mrktTotAmt": c.mrktTotAmt,
-        }
-        for c in companies
-    ]
-
+async def load(themes: list[Theme]):
     theme_batch = [
         {
             "name":            theme.name,
@@ -31,7 +16,6 @@ async def load(themes: list[Theme], companies: list[Company]):
         for theme in themes
     ]
 
-    await upsert_companies(company_batch)
     await upsert_themes(theme_batch)
 
-    print(f"✅ {len(companies)}개 Company 노드, {len(themes)}개 Theme 및 BELONGS_TO 관계 적재 완료")
+    print(f"✅ {len(themes)}개 Theme 및 BELONGS_TO 관계 적재 완료")

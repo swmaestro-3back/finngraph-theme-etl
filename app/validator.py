@@ -1,7 +1,7 @@
 import re
 
 from app.crud.themes import fetch_theme_stock_map, theme_exists
-from app.models import CompanyBase, Theme
+from app.models import Company, Theme
 
 CONTAINMENT_OVERLAP_THRESHOLD = 0.9
 MIN_STOCKS_FOR_CONTAINMENT = 5
@@ -63,7 +63,7 @@ async def validate(themes: list[Theme]) -> list[Theme]:
     merged_stocks: dict[str, set[str]] = {}
 
     for theme in themes:
-        candidate_stocks = {c.srtnCd for c in theme.companies if isinstance(c, CompanyBase)}
+        candidate_stocks = {c.srtnCd for c in theme.companies if isinstance(c, Company)}
 
         dup_name = _find_duplicate_name(theme, candidate_stocks, merged_stocks)
         if dup_name is None:
@@ -78,7 +78,7 @@ async def validate(themes: list[Theme]) -> list[Theme]:
             target = merged[dup_name]
             target_srtn = merged_stocks[dup_name]
             for c in theme.companies:
-                if isinstance(c, CompanyBase) and c.srtnCd not in target_srtn:
+                if isinstance(c, Company) and c.srtnCd not in target_srtn:
                     target.companies.append(c)
                     target_srtn.add(c.srtnCd)
             print(f"🔗 [{theme.name}] → [{dup_name}] 배치 내 테마로 병합 (병합 종목 {len(candidate_stocks)}개, 최종 종목 {len(target_srtn)}개)")
