@@ -1,5 +1,7 @@
 from app.core import neo4j_database
 
+# 테마 존재성 확인
+# 초기 테마가 하나도 없는 경우에 저장하기 위함
 async def theme_exists() -> bool:
     records = await neo4j_database.execute(
         """
@@ -9,55 +11,45 @@ RETURN t LIMIT 1
     )
     return len(records) > 0
 
+# 전체 테마와 테마주 정보 조회
 async def fetch_theme_stock_map() -> dict[str, set[str]]:
     records = await neo4j_database.execute(
         """
 MATCH (t:Theme)
 OPTIONAL MATCH (c:Company)-[:BELONGS_TO]->(t)
-RETURN t.name AS theme_name, coalesce(t.description, '') AS description, collect(c.srtnCd) AS srtn_codes
+WHERE c:KOSPI OR c:KOSDAQ
+RETURN t.name AS theme_name, coalesce(t.description, '') AS description, collect(c.ticker) AS tickers
 """
     )
-    return {r["theme_name"]: set(r["srtn_codes"]) for r in records}
+    return {r["theme_name"]: set(r["tickers"]) for r in records}
 
-async def fetch_existing_company_srtn_codes() -> set[str]:
+# 전체 기업 조회
+# WHERE 절로 해도 라벨 인덱스를 탄다
+async def fetch_existing_company_tickers() -> set[str]:
     records = await neo4j_database.execute(
         """
 MATCH (c:Company)
-RETURN c.srtnCd AS srtnCd
+WHERE c:KOSPI OR c:KOSDAQ
+RETURN c.ticker AS ticker
 """
     )
-    return {r["srtnCd"] for r in records}
+    return {r["ticker"] for r in records}
 
-async def fetch_company_srtn_by_names(names: list[str]) -> dict[str, str]:
-    """name으로 기존 Neo4j Company를 조회해 name -> srtnCd 매핑을 반환한다."""
+# 기업명에 대한 Ticker 값 조회
+async def fetch_company_ticker_by_names(names: list[str]) -> dict[str, str]:
     records = await neo4j_database.execute(
         """
 UNWIND $names AS name
 MATCH (c:Company {name: name})
-RETURN c.name AS name, c.srtnCd AS srtnCd
+WHERE c:KOSPI OR c:KOSDAQ
+RETURN c.name AS name, c.ticker AS ticker
 """,
         parameters={"names": names},
     )
-    return {r["name"]: r["srtnCd"] for r in records}
+    return {r["name"]: r["ticker"] for r in records}
 
-async def upsert_companies(company_batch: list[dict]) -> None:
-    await neo4j_database.execute(
-        """
-UNWIND $companies AS company
-MERGE (c:Company {srtnCd: company.srtnCd})
-SET
-    c.name       = company.name,
-    c.market     = company.market,
-    c.clpr       = company.clpr,
-    c.vs         = company.vs,
-    c.fltRt      = company.fltRt,
-    c.trqu       = company.trqu,
-    c.trPrc      = company.trPrc,
-    c.mrktTotAmt  = company.mrktTotAmt
-""",
-    parameters={"companies": company_batch},
-    )
-
+# 테마 저장
+# 여기엔 굳이 없어도 될거 같은데?
 async def upsert_themes(theme_batch: list[dict]) -> None:
     await neo4j_database.execute(
         """
@@ -70,7 +62,7 @@ ON CREATE SET
     t.source = theme.source
 WITH t, theme
 UNWIND theme.companies AS company
-MATCH (c:Company {srtnCd: company.srtnCd})
+MATCH (c:Company {ticker: company.ticker})
 MERGE (c)-[r:BELONGS_TO]->(t)
 ON CREATE SET r.reason = company.reason
 """,
