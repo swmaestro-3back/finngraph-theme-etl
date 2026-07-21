@@ -14,8 +14,6 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    OPENDATA_SERVICE_KEY: str
-
     NEO4J_URI: str
     NEO4J_USERNAME: str
     NEO4J_PASSWORD: str
