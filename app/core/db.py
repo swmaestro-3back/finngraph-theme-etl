@@ -1,6 +1,10 @@
+import logging
+
 from neo4j import AsyncGraphDatabase, Record
 from typing import Optional, LiteralString
 from app.core.configs import settings
+
+logger = logging.getLogger(__name__)
 
 # BoltDriver
 # It addresses a single database machine. This may be a standalone server or could be a specific member of a cluster.
@@ -21,8 +25,9 @@ class Neo4jDatabase:
                 uri=settings.NEO4J_URI,
                 auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD)
             )
-        except Exception as e:
-            raise e
+        except Exception:
+            logger.exception("Neo4j Driver 초기화 실패")
+            raise
     
     async def close(self):
         if self._driver:
