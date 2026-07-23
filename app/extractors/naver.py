@@ -20,7 +20,6 @@ class NaverExtractor(BaseExtractor):
         "2026 상반기 신규상장", "2026 하반기 신규상장", "기업인수목적회사(SPAC)", "리츠(REITs)", "S7(삼성전자/SK하이닉스 등)", "S7"
     ]
 
-    BASE_URL = "https://finance.naver.com"
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36",
         "Upgrade-Insecure-Requests": "1",
@@ -29,6 +28,8 @@ class NaverExtractor(BaseExtractor):
         "Accept-Language": "en-US,en;q=0.5",
         "Accept-Encoding": "gzip, deflate",
     }
+
+    BASE_URL = "https://finance.naver.com"
 
     async def fetch_themes(self) -> list[Theme]:
         """
@@ -41,7 +42,7 @@ class NaverExtractor(BaseExtractor):
             url = f"{self.BASE_URL}/sise/theme.naver?&page={pagenum}"
 
             # EUC-KR로 인코딩해서 보내주므로 EUC-KR로 디코딩해야함
-            async with session.get(url, headers=self.HEADERS) as resp:
+            async with session.get(url, headers=self.HEADERS, timeout=self.TIMEOUT) as resp:
                 text = await resp.text(encoding="euc-kr")
 
             soup = BeautifulSoup(text, "lxml")

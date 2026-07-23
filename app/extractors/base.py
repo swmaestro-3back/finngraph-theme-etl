@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import date
 import json
 import logging
+import aiohttp
 from app.models import Theme, Company
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,15 @@ class BaseExtractor(ABC):
 
     source_name: str      # 크롤링 도메인 이름
     blacklist: list[str]  # 테마 블랙리스트
+
+    HEADERS: dict[str, str] = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+    }
+    TIMEOUT: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=10)
 
     @abstractmethod
     async def fetch_themes(self) -> list[Theme]:

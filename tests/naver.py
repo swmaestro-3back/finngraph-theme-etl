@@ -3,14 +3,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-sys.path.insert(0, str(Path(__file__).parents[1] / "app"))
-sys.path.insert(0, str(Path(__file__).parents[1] / "app" / "pipeline"))
 
 from app.extractors.naver import NaverExtractor
-from app.core import http_client
+from app.core import http_client, setup_logging
 
 
 async def main():
+    setup_logging()
     http_client.start()
     try:
         extractor = NaverExtractor()

@@ -11,14 +11,6 @@ from app.models import Company, Theme
 
 logger = logging.getLogger(__name__)
 
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-}
-
 class JudalExtractor(BaseExtractor):
     source_name = "judal"
     blacklist = [
@@ -27,8 +19,9 @@ class JudalExtractor(BaseExtractor):
 
     async def fetch_themes(self) -> list[Theme]:
         url = "https://www.judal.co.kr/?view=themeList"
+        
         session = http_client.get_session()
-        async with session.get(url, headers=_HEADERS, timeout=10) as response:
+        async with session.get(url, headers=self.HEADERS, timeout=self.TIMEOUT) as response:
             response.raise_for_status()
             text = await response.text()
 
@@ -77,7 +70,7 @@ class JudalExtractor(BaseExtractor):
 
         try:
             session = http_client.get_session()
-            async with session.get(url, headers=_HEADERS, timeout=10) as response:
+            async with session.get(url, headers=self.HEADERS, timeout=self.TIMEOUT) as response:
                 response.raise_for_status()
                 text = await response.text()
 

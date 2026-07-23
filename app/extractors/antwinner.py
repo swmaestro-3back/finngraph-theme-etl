@@ -6,18 +6,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_THEME_KEYWORDS_URL = "https://antwinner.com/api/proxy/theme-keywords"
-_SCREENER_URL = "https://antwinner.com/api/screener"
-
-_HEADERS = {"User-Agent": "Mozilla/5.0"}
-
 class AntWinnerExtractor(BaseExtractor):
     source_name: str = "antwinner"
     blacklist = ["하락장"]
 
     async def fetch_themes(self) -> list[Theme]:
+        url = "https://antwinner.com/api/proxy/theme-keywords"
+        
         session = http_client.get_session()
-        async with session.get(_THEME_KEYWORDS_URL, headers=_HEADERS, timeout=10) as response:
+        async with session.get(url, headers=self.HEADERS, timeout=self.TIMEOUT) as response:
             response.raise_for_status()
             names = await response.json()
         
@@ -31,11 +28,13 @@ class AntWinnerExtractor(BaseExtractor):
             "sortBy": "rate",
             "themes": theme_name,
         }
+
+        url = "https://antwinner.com/api/screener"
         companies: list[Company] = []
 
         try:
             session = http_client.get_session()
-            async with session.get(_SCREENER_URL, params=params, headers=_HEADERS, timeout=10) as response:
+            async with session.get(url, params=params, headers=self.HEADERS, timeout=self.TIMEOUT) as response:
                 response.raise_for_status()
                 data = await response.json()
 
