@@ -1,7 +1,7 @@
 import logging
 import re
 
-from app.crud.themes import fetch_company_ticker_by_names, fetch_theme_stock_map, theme_exists
+from app.crud import fetch_company_ticker_by_names, fetch_theme_stock_map, theme_exists
 from app.models import Company, Theme
 
 logger = logging.getLogger(__name__)

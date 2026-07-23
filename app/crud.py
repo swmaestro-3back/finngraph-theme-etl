@@ -1,7 +1,16 @@
 from app.core import neo4j_database
 
+# 전체 Theme 노드와 여기 연결된 간선 삭제
+async def delete_all_themes() -> None:
+    await neo4j_database.execute(
+        """
+MATCH (t:Theme)
+DETACH DELETE t
+"""
+    )
+
 # 테마 존재성 확인
-# 초기 테마가 하나도 없는 경우에 저장하기 위함
+# 초기 테마가 하나도 없는 경우에 검증하지 않고 저장하기 위함
 async def theme_exists() -> bool:
     records = await neo4j_database.execute(
         """

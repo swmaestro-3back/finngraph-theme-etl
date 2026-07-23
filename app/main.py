@@ -11,8 +11,9 @@ from app.extractors.factory import ExtractorFactory
 from app.validator import validate
 from app.loader import load
 from app.core import neo4j_database, http_client, setup_logging
+from app.crud import delete_all_themes
 from app.models import Theme
-from app.core import settings
+from app.core import settings   # main 실행 시 한번 강제로 컴파일되도록 하기 위함
 
 logger = logging.getLogger(__name__)
 
@@ -20,17 +21,28 @@ SOURCES = ["judal", "naver", "antwinner"]
 
 DATA_ROOT = Path(__file__).parent.parent / "data"
 
-async def run_etl_pipeline() -> None:
-    """모든 SOURCE를 순차로 extract한 뒤, 모아진 데이터를 대상으로
-    validate/load를 한 번씩만 수행한다."""
-    all_themes: list[Theme] = []
+async def _extract_source(source_name: str) -> list[Theme]:
+    logger.info(f"[{source_name}] 추출 시작")
+    extractor = ExtractorFactory.get_extractor(source_name)
+    themes = await extractor.extract()
+    extractor.save(themes)
+    return themes
 
-    for source_name in SOURCES:
-        logger.info(f"[{source_name}] 추출 시작")
-        extractor = ExtractorFactory.get_extractor(source_name)
-        themes = await extractor.extract()
-        extractor.save(themes)
-        all_themes.extend(themes)
+async def run_etl_pipeline() -> None:
+    """모든 SOURCE를 병렬로 extract한 뒤, 모아진 데이터를 대상으로
+    validate/load를 한 번씩만 수행한다.
+    결과는 SOURCES 순서대로 집계되며, 일부 소스가 실패해도 나머지는 진행한다."""
+    results = await asyncio.gather(
+        *(_extract_source(source_name) for source_name in SOURCES),
+        return_exceptions=True,
+    )
+
+    all_themes: list[Theme] = []
+    for source_name, result in zip(SOURCES, results):
+        if isinstance(result, Exception):
+            logger.error(f"[{source_name}] 추출 실패, 건너뜀: {result}")
+            continue
+        all_themes.extend(result)
 
     validated_themes = await validate(all_themes)
     await load(validated_themes)
@@ -68,6 +80,9 @@ async def main() -> None:
     logger.info("HTTP Client 시작")
     neo4j_database.init_driver()
     logger.info("Neo4j Driver 초기화 완료")
+
+    await delete_all_themes()
+    logger.info("기존 Theme 및 연결 간선 삭제 완료")
 
     try:
         await run_etl_pipeline()

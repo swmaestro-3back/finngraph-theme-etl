@@ -1,6 +1,6 @@
 import logging
 
-from app.crud.themes import upsert_themes
+from app.crud import upsert_themes
 from app.models import Theme
 
 logger = logging.getLogger(__name__)
